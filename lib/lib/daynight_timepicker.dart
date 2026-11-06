@@ -1,3 +1,4 @@
+import 'package:day_night_time_picker_plus/lib/common/filter_wrapper.dart';
 import 'package:day_night_time_picker_plus/lib/constants.dart';
 import 'package:day_night_time_picker_plus/lib/day_night_timepicker_android.dart';
 import 'package:day_night_time_picker_plus/lib/day_night_timepicker_ios.dart';
@@ -18,13 +19,13 @@ import 'package:material_ui/material_ui.dart';
 ///
 /// **onChangeDateTime** - Return the new time the user picked as [DateTime].
 ///
-/// **onCancel** - Custom callback for the Cancel button. Note: if provided, it will override the default behavior of the Cancel button.
+/// **onCancel** - Custom callback for the Cancel button. Note: if provided, it will override the default behavior of the Cancel button, so closing the picker is up to the callback. The Ok button is not affected.
 ///
 /// **is24HrFormat** - Show the time in TimePicker in 24 hour format. Defaults to `false`.
 ///
-/// **accentColor** - Accent color of the TimePicker. Defaults to `Theme.of(context).accentColor`.
+/// **accentColor** - Accent color of the TimePicker. Defaults to `Theme.of(context).colorScheme.primary`.
 ///
-/// **unselectedColor** - Color applied unselected options (am/pm, hour/minute). Defaults to `Colors.grey`.
+/// **unselectedColor** - Color applied unselected options (am/pm, hour/minute). Defaults to `Theme.of(context).colorScheme.onSurfaceVariant`.
 ///
 /// **cancelText** - Text displayed for the Cancel button. Defaults to `Cancel`.
 ///
@@ -40,11 +41,11 @@ import 'package:material_ui/material_ui.dart';
 ///
 /// **blurredBackground** - Whether to blur the background of the [Modal]. Defaults to `false`.
 ///
-/// **backgroundColor** - Set to the background of the [Modal]. Defaults to `Colors.white`.
+/// **backgroundColor** - Set to the background of the [Modal]. Defaults to `Theme.of(context).colorScheme.surface`.
 ///
 /// **barrierColor** - Color of the background of the [Modal]. Defaults to `Colors.black45`.
 ///
-/// **borderRadius** - Border radius of the [Container] in `double`. Defaults to `10.0`.
+/// **borderRadius** - Border radius of the [Container] in `double`. Defaults to `24.0`.
 ///
 /// **elevation** - Elevation of the [Modal] in double. Defaults to `12.0`.
 ///
@@ -98,11 +99,11 @@ import 'package:material_ui/material_ui.dart';
 ///
 /// **disableAutoFocusToNextInput** - Whether to disable the auto focus to the next input after current input is selected. Defaults to `false`.
 ///
-/// **width** - Fixed width of the Picker container. Defaults to `300` but `350` for `iosStyle`.
+/// **width** - Maximum width of the Picker container. Defaults to `300` but `350` for `iosStyle`.
 ///
-/// **height** - Fixed height of the Picker container. Defaults to `245`.
+/// **height** - Minimum height of the content below the sky. Defaults to `260`.
 ///
-/// **wheelHeight** - Fixed height of the iOS style scrolling wheel. Defaults to `100`.
+/// **wheelHeight** - Fixed height of the iOS style scrolling wheel. Defaults to `120`.
 ///
 /// **wheelMagnification** - Magnification of the iOS style scrolling wheel. Defaults to `1`.
 ///
@@ -168,7 +169,7 @@ dynamic showPicker({
   double? buttonsSpacing,
   bool hideButtons = false,
   bool disableAutoFocusToNextInput = false,
-  double width = 300,
+  double? width,
   double? height,
   bool showSecondSelector = false,
   double? wheelHeight,
@@ -187,9 +188,7 @@ dynamic showPicker({
     maxHour = 23;
   }
 
-  if (iosStylePicker) {
-    width = 350;
-  }
+  final pickerWidth = width ?? (iosStylePicker ? 350.0 : 300.0);
 
   assert(
     !(disableHour == true && disableMinute == true),
@@ -253,7 +252,7 @@ dynamic showPicker({
     secondLabel: secondLabel,
     ltrMode: ltrMode,
     disableAutoFocusToNextInput: disableAutoFocusToNextInput,
-    width: width,
+    width: pickerWidth,
     height: height,
     showSecondSelector: showSecondSelector,
     wheelHeight: wheelHeight,
@@ -267,74 +266,57 @@ dynamic showPicker({
     duskSpanInMinutes: duskSpanInMinutes,
   );
 
+  Widget picker(BuildContext context) => timeModelBinding(
+    Theme(
+      data: themeData ?? Theme.of(context),
+      child: iosStylePicker
+          ? DayNightTimePickerIos(
+              sunrise: sunrise,
+              sunset: sunset,
+              duskSpanInMinutes: duskSpanInMinutes,
+            )
+          : DayNightTimePickerAndroid(
+              sunrise: sunrise,
+              sunset: sunset,
+              duskSpanInMinutes: duskSpanInMinutes,
+            ),
+    ),
+  );
+
   if (isInlinePicker) {
-    return timeModelBinding(
-      Builder(
-        builder: (context) {
-          if (iosStylePicker) {
-            return Builder(
-              builder: (context) {
-                return Theme(
-                  data: themeData ?? Theme.of(context),
-                  child: DayNightTimePickerIos(
-                    sunrise: sunrise,
-                    sunset: sunset,
-                    duskSpanInMinutes: duskSpanInMinutes,
-                  ),
-                );
-              },
-            );
-          } else {
-            return Builder(
-              builder: (context) {
-                return Theme(
-                  data: themeData ?? Theme.of(context),
-                  child: DayNightTimePickerAndroid(
-                    sunrise: sunrise,
-                    sunset: sunset,
-                    duskSpanInMinutes: duskSpanInMinutes,
-                  ),
-                );
-              },
-            );
-          }
-        },
-      ),
-    );
+    return Builder(builder: picker);
   }
 
   return PageRouteBuilder(
-    pageBuilder: (context, _, _) {
-      if (iosStylePicker) {
-        return Theme(
-          data: themeData ?? Theme.of(context),
-          child: DayNightTimePickerIos(
-            sunrise: sunrise,
-            sunset: sunset,
-            duskSpanInMinutes: duskSpanInMinutes,
+    // The picker is built here once, rather than in `transitionsBuilder` which
+    // runs on every frame of the transition and would rebuild all of the picker.
+    pageBuilder: (context, _, _) => picker(context),
+    transitionDuration: const Duration(milliseconds: 280),
+    reverseTransitionDuration: const Duration(milliseconds: 180),
+    transitionsBuilder: (context, anim, secondAnim, child) {
+      final transition = FadeTransition(
+        opacity: anim.drive(CurveTween(curve: Curves.easeOut)),
+        child: ScaleTransition(
+          scale: anim.drive(
+            Tween(
+              begin: 0.94,
+              end: 1.0,
+            ).chain(CurveTween(curve: Curves.easeOutCubic)),
           ),
-        );
-      } else {
-        return Theme(
-          data: themeData ?? Theme.of(context),
-          child: DayNightTimePickerAndroid(
-            sunrise: sunrise,
-            sunset: sunset,
-            duskSpanInMinutes: duskSpanInMinutes,
-          ),
-        );
+          child: child,
+        ),
+      );
+      if (!blurredBackground) {
+        return transition;
       }
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          FilterWrapper(animation: anim),
+          transition,
+        ],
+      );
     },
-    transitionDuration: const Duration(milliseconds: 200),
-    transitionsBuilder: (context, anim, secondAnim, child) => SlideTransition(
-      position: anim.drive(
-        Tween(
-          begin: const Offset(0, 0.15),
-          end: const Offset(0, 0),
-        ).chain(CurveTween(curve: Curves.ease)),
-      ),
-      child: FadeTransition(opacity: anim, child: timeModelBinding(child)),
-    ),
     barrierDismissible: barrierDismissible,
     opaque: false,
     barrierColor: barrierColor,

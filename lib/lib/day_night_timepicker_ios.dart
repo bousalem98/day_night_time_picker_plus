@@ -1,17 +1,21 @@
-// ignore_for_file: library_private_types_in_public_api, no_leading_underscores_for_local_identifiers
+// ignore_for_file: library_private_types_in_public_api
 
 import 'package:day_night_time_picker_plus/day_night_time_picker_plus.dart';
 import 'package:day_night_time_picker_plus/lib/common/action_buttons.dart';
 import 'package:day_night_time_picker_plus/lib/common/display_wheel.dart';
-import 'package:day_night_time_picker_plus/lib/common/filter_wrapper.dart';
+import 'package:day_night_time_picker_plus/lib/common/picker_colors.dart';
 import 'package:day_night_time_picker_plus/lib/common/wrapper_container.dart';
 import 'package:day_night_time_picker_plus/lib/common/wrapper_dialog.dart';
 import 'package:day_night_time_picker_plus/lib/state/state_container.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'ampm.dart';
 import 'daynight_banner.dart';
 import 'utils.dart';
+
+/// Widest a wheel gets, so that a few wheels stay together on a wide picker.
+const double _maxWheelWidth = 88;
 
 /// Private class. [StatefulWidget] that renders the content of the picker.
 // ignore: must_be_immutable
@@ -33,295 +37,301 @@ class DayNightTimePickerIos extends StatefulWidget {
 /// Picker state class
 class _DayNightTimePickerIosState extends State<DayNightTimePickerIos> {
   /// Instance of the time state
-  TimeModelBindingState? timeState;
+  late TimeModelBindingState timeState;
+
+  /// Whether [init] was called
+  bool _initialized = false;
+
+  /// Number of wheels being moved by [_syncWheels] rather than by the user
+  int _syncing = 0;
 
   /// Controller for `hour` list
-  FixedExtentScrollController? _hourController;
+  late final FixedExtentScrollController _hourController;
 
   /// Controller for `minute` list
-  FixedExtentScrollController? _minuteController;
+  late final FixedExtentScrollController _minuteController;
 
   /// Controller for `second` list
-  FixedExtentScrollController? _secondController;
+  late final FixedExtentScrollController _secondController;
 
   /// List of hours to show
-  List<int?> hours = [];
+  late final List<int?> hours;
 
   /// List of minutes to show
-  List<int?> minutes = [];
+  late final List<int?> minutes;
 
   /// List of seconds to show
-  List<int?> seconds = [];
-
-  /// Whether to display the time from left to right or right to left.(Standard: left to right)
-  TextDirection? ltrMode;
+  late final List<int?> seconds;
 
   /// initial setup
   void init() {
-    final hourDiv =
-        ((timeState!.widget.maxHour! - timeState!.widget.minHour!) + 1).round();
-    final _hours = generateHours(
-      hourDiv,
-      timeState!.widget.minHour,
-      timeState!.widget.maxHour,
+    final picker = timeState.widget;
+    hours = generateHours(
+      ((picker.maxHour! - picker.minHour!) + 1).round(),
+      picker.minHour,
+      picker.maxHour,
     );
 
-    double minMinute = getMin(
-      timeState!.widget.minMinute,
-      timeState!.widget.minuteInterval,
-    );
-    double maxMinute = getMax(
-      timeState!.widget.maxMinute,
-      timeState!.widget.minuteInterval,
-    );
-
-    double minSecond = getMin(
-      timeState!.widget.minSecond,
-      timeState!.widget.secondInterval,
-    );
-    double maxSecond = getMax(
-      timeState!.widget.maxSecond,
-      timeState!.widget.secondInterval,
-    );
-
-    int minDiff = (maxMinute - minMinute).round();
-    int secDiff = (maxSecond - minSecond).round();
-
-    final minuteDiv = getDivisions(minDiff, timeState!.widget.minuteInterval);
-    List<int?> _minutes = generateMinutesOrSeconds(
-      minuteDiv,
-      timeState!.widget.minuteInterval,
+    final minMinute = getMin(picker.minMinute, picker.minuteInterval);
+    final maxMinute = getMax(picker.maxMinute, picker.minuteInterval);
+    minutes = generateMinutesOrSeconds(
+      getDivisions((maxMinute - minMinute).round(), picker.minuteInterval),
+      picker.minuteInterval,
       minMinute,
       maxMinute,
     );
 
-    final secondDiv = getDivisions(secDiff, timeState!.widget.secondInterval);
-    List<int?> _seconds = generateMinutesOrSeconds(
-      secondDiv,
-      timeState!.widget.secondInterval,
+    final minSecond = getMin(picker.minSecond, picker.secondInterval);
+    final maxSecond = getMax(picker.maxSecond, picker.secondInterval);
+    seconds = generateMinutesOrSeconds(
+      getDivisions((maxSecond - minSecond).round(), picker.secondInterval),
+      picker.secondInterval,
       minSecond,
       maxSecond,
     );
 
-    final h = timeState!.time.hour;
-    final m = timeState!.time.minute;
-    final s = timeState!.time.second;
-
-    _hourController =
-        FixedExtentScrollController(initialItem: _hours.indexOf(h))
-          ..addListener(() {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                timeState!.onSelectedInputChange(SelectedInput.HOUR);
-              }
-            });
-          })
-          ..addListener(() {
-            _hourController!.position.isScrollingNotifier.addListener(() {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (!_hourController!.position.isScrollingNotifier.value) {
-                  if (!timeState!.widget.disableAutoFocusToNextInput) {
-                    if (!(timeState!.widget.disableMinute ?? false)) {
-                      timeState!.onSelectedInputChange(SelectedInput.MINUTE);
-                    } else if (timeState!.widget.showSecondSelector) {
-                      timeState!.onSelectedInputChange(SelectedInput.SECOND);
-                    }
-                  }
-                  if (timeState!.widget.isOnValueChangeMode) {
-                    timeState!.onOk();
-                  }
-                }
-              });
-            });
-          });
-
-    _minuteController =
-        FixedExtentScrollController(initialItem: _minutes.indexOf(m))
-          ..addListener(() {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                timeState!.onSelectedInputChange(SelectedInput.MINUTE);
-                setState(() {
-                  hours = _hours;
-                  minutes = _minutes;
-                  seconds = _seconds;
-                });
-              }
-            });
-          })
-          ..addListener(() {
-            _minuteController!.position.isScrollingNotifier.addListener(() {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (!_minuteController!.position.isScrollingNotifier.value) {
-                  if (!timeState!.widget.disableAutoFocusToNextInput &&
-                      timeState!.widget.showSecondSelector) {
-                    timeState!.onSelectedInputChange(SelectedInput.SECOND);
-                  }
-                  if (timeState!.widget.isOnValueChangeMode) {
-                    timeState!.onOk();
-                  }
-                }
-              });
-            });
-          });
-
-    if (timeState!.widget.showSecondSelector) {
-      _secondController =
-          FixedExtentScrollController(initialItem: _seconds.indexOf(s))
-            ..addListener(() {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) {
-                  timeState!.onSelectedInputChange(SelectedInput.SECOND);
-                  setState(() {
-                    hours = _hours;
-                    minutes = _minutes;
-                    seconds = _seconds;
-                  });
-                }
-              });
-            })
-            ..addListener(() {
-              _secondController!.position.isScrollingNotifier.addListener(() {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (timeState!.widget.isOnValueChangeMode &&
-                      !_secondController!.position.isScrollingNotifier.value) {
-                    timeState!.onOk();
-                  }
-                });
-              });
-            });
-    }
-    if (hours.isEmpty || minutes.isEmpty || seconds.isEmpty) {
-      setState(() {
-        hours = _hours;
-        minutes = _minutes;
-        seconds = _seconds;
-      });
-    }
-
-    ltrMode = timeState!.widget.ltrMode ? TextDirection.ltr : TextDirection.rtl;
+    final time = timeState.time;
+    _hourController = FixedExtentScrollController(
+      initialItem: nearestIndex(hours, time.hour),
+    );
+    _minuteController = FixedExtentScrollController(
+      initialItem: nearestIndex(minutes, time.minute),
+    );
+    _secondController = FixedExtentScrollController(
+      initialItem: nearestIndex(seconds, time.second),
+    );
   }
 
   @override
   void didChangeDependencies() {
-    if (timeState == null) {
-      timeState = TimeModelBinding.of(context);
-      init();
-    }
     super.didChangeDependencies();
+    timeState = TimeModelBinding.of(context);
+    if (!_initialized) {
+      _initialized = true;
+      init();
+    } else {
+      SchedulerBinding.instance.addPostFrameCallback((_) => _syncWheels());
+    }
+  }
+
+  @override
+  void dispose() {
+    _hourController.dispose();
+    _minuteController.dispose();
+    _secondController.dispose();
+    super.dispose();
+  }
+
+  /// Move the wheels to the current time, when it was changed by something
+  /// other than them, such as the AM/PM control or a new `value`.
+  void _syncWheels() {
+    if (!mounted) {
+      return;
+    }
+    final time = timeState.time;
+    _syncWheel(_hourController, nearestIndex(hours, time.hour));
+    _syncWheel(_minuteController, nearestIndex(minutes, time.minute));
+    _syncWheel(_secondController, nearestIndex(seconds, time.second));
+  }
+
+  void _syncWheel(FixedExtentScrollController controller, int index) {
+    if (!controller.hasClients || controller.selectedItem == index) {
+      return;
+    }
+    // Do not fight with the user, whose scrolling is what sets the time anyway.
+    if (_syncing == 0 && controller.position.isScrollingNotifier.value) {
+      return;
+    }
+    _syncing++;
+    controller
+        .animateToItem(
+          index,
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? const Duration(milliseconds: 1)
+              : const Duration(milliseconds: 350),
+          curve: Curves.easeOutCubic,
+        )
+        .whenComplete(() => _syncing--);
+  }
+
+  /// Run [callback], unless the wheels were moved by [_syncWheels].
+  ///
+  /// A scroll notification can arrive during layout, when the state can not be
+  /// changed yet. In that case, wait for the end of the frame.
+  void _onUserScroll(VoidCallback callback) {
+    if (_syncing > 0) {
+      return;
+    }
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          callback();
+        }
+      });
+    } else {
+      callback();
+    }
+  }
+
+  /// Handle the wheel of [input] coming to rest
+  void _onScrollEnd(SelectedInput input) {
+    _onUserScroll(() {
+      final picker = timeState.widget;
+      if (!picker.disableAutoFocusToNextInput) {
+        if (input == SelectedInput.HOUR && !picker.disableMinute!) {
+          timeState.onSelectedInputChange(SelectedInput.MINUTE);
+        } else if (input != SelectedInput.SECOND && picker.showSecondSelector) {
+          timeState.onSelectedInputChange(SelectedInput.SECOND);
+        }
+      }
+      if (picker.isOnValueChangeMode) {
+        timeState.onOk();
+      }
+    });
   }
 
   int getModifiedLabel(int value) {
-    if (value == 0 && timeState!.widget.is24HrFormat) {
-      return 0;
-    } else if (value == 0 && !timeState!.widget.is24HrFormat) {
+    if (timeState.widget.is24HrFormat) {
+      return value;
+    }
+    if (value == 0) {
       return 12;
     }
-    if (value > 12 && timeState!.widget.is24HrFormat) {
-      return value;
-    } else if (value > 12 && !timeState!.widget.is24HrFormat) {
-      return value - 12;
-    }
-    return value;
+    return value > 12 ? value - 12 : value;
   }
 
   @override
   Widget build(BuildContext context) {
-    Orientation currentOrientation = MediaQuery.of(context).orientation;
-    double wheelHeight = TimeModelBinding.of(context).widget.wheelHeight;
+    final picker = timeState.widget;
+    final colors = PickerColors.of(context);
+    final textDirection = picker.ltrMode
+        ? TextDirection.ltr
+        : TextDirection.rtl;
+    final labelStyle =
+        picker.hmsStyle ??
+        Theme.of(context).textTheme.labelSmall!
+            .copyWith(color: colors.unselected);
 
-    return Center(
-      child: SingleChildScrollView(
-        physics: currentOrientation == Orientation.portrait
-            ? const NeverScrollableScrollPhysics()
-            : const AlwaysScrollableScrollPhysics(),
-        child: FilterWrapper(
-          child: WrapperDialog(
+    Widget column(Widget child) => Flexible(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: _maxWheelWidth),
+        child: child,
+      ),
+    );
+
+    Widget wheel({
+      required SelectedInput input,
+      required FixedExtentScrollController controller,
+      required List<int?> items,
+      required void Function(double value) onChange,
+      bool disabled = false,
+      int Function(int)? label,
+    }) => column(
+      DisplayWheel(
+        controller: controller,
+        items: items,
+        isSelected: timeState.selected == input,
+        disabled: disabled,
+        getModifiedLabel: label,
+        onChange: (index) {
+          if (_syncing == 0) {
+            onChange(items[index]! + 0.0);
+          }
+        },
+        onScrollStart: () =>
+            _onUserScroll(() => timeState.onSelectedInputChange(input)),
+        onScrollEnd: () => _onScrollEnd(input),
+      ),
+    );
+
+    Widget label(String text) => column(
+      Center(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(text, style: labelStyle, maxLines: 1),
+        ),
+      ),
+    );
+
+    return WrapperDialog(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          DayNightBanner(
+            sunrise: widget.sunrise,
+            sunset: widget.sunset,
+            duskSpanInMinutes: widget.duskSpanInMinutes,
+          ),
+          WrapperContainer(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                DayNightBanner(
-                  sunrise: widget.sunrise,
-                  sunset: widget.sunset,
-                  duskSpanInMinutes: widget.duskSpanInMinutes,
+                const AmPm(),
+                const SizedBox(height: 8),
+                const Spacer(),
+                Row(
+                  textDirection: textDirection,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    label(picker.hourLabel!),
+                    label(picker.minuteLabel!),
+                    if (picker.showSecondSelector) label(picker.secondLabel!),
+                  ],
                 ),
-                WrapperContainer(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      const AmPm(),
-                      const Spacer(),
-                      SizedBox(
-                        height: wheelHeight,
-                        child: Row(
-                          textDirection: ltrMode,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: <Widget>[
-                            DisplayWheel(
-                              controller: _hourController!,
-                              items: hours,
-                              isSelected:
-                                  timeState!.selected == SelectedInput.HOUR,
-                              onChange: (int value) {
-                                timeState!.onHourChange(hours[value]! + 0.0);
-                              },
-                              disabled: timeState!.widget.disableHour!,
-                              getModifiedLabel: getModifiedLabel,
-                            ),
-                            Text(
-                              timeState!.widget.hourLabel!,
-                              style: timeState!.widget.hmsStyle,
-                            ),
-                            DisplayWheel(
-                              controller: _minuteController!,
-                              items: minutes,
-                              isSelected:
-                                  timeState!.selected == SelectedInput.MINUTE,
-                              onChange: (int value) {
-                                timeState!.onMinuteChange(
-                                  minutes[value]! + 0.0,
-                                );
-                              },
-                              disabled: timeState!.widget.disableMinute!,
-                            ),
-                            Text(
-                              timeState!.widget.minuteLabel!,
-                              style: timeState!.widget.hmsStyle,
-                            ),
-                            ...(timeState!.widget.showSecondSelector
-                                ? [
-                                    DisplayWheel(
-                                      controller: _secondController!,
-                                      items: seconds,
-                                      isSelected:
-                                          timeState!.selected ==
-                                          SelectedInput.SECOND,
-                                      onChange: (int value) {
-                                        timeState!.onSecondChange(
-                                          seconds[value]! + 0.0,
-                                        );
-                                      },
-                                    ),
-                                    Text(
-                                      timeState!.widget.secondLabel!,
-                                      style: timeState!.widget.hmsStyle,
-                                    ),
-                                  ]
-                                : []),
-                          ],
+                const SizedBox(height: 2),
+                SizedBox(
+                  height: picker.wheelHeight,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // The band that marks the selected row across the wheels
+                      Container(
+                        height: wheelItemExtent,
+                        decoration: BoxDecoration(
+                          color: colors.accent.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      const Spacer(),
-                      if (!timeState!.widget.hideButtons) const ActionButtons(),
+                      Row(
+                        textDirection: textDirection,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: <Widget>[
+                          wheel(
+                            input: SelectedInput.HOUR,
+                            controller: _hourController,
+                            items: hours,
+                            onChange: timeState.onHourChange,
+                            disabled: picker.disableHour!,
+                            label: getModifiedLabel,
+                          ),
+                          wheel(
+                            input: SelectedInput.MINUTE,
+                            controller: _minuteController,
+                            items: minutes,
+                            onChange: timeState.onMinuteChange,
+                            disabled: picker.disableMinute!,
+                          ),
+                          if (picker.showSecondSelector)
+                            wheel(
+                              input: SelectedInput.SECOND,
+                              controller: _secondController,
+                              items: seconds,
+                              onChange: timeState.onSecondChange,
+                            ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
+                const Spacer(),
+                if (!picker.hideButtons) const ActionButtons(),
               ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }

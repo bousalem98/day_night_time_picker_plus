@@ -1,10 +1,11 @@
-// ignore_for_file: no_leading_underscores_for_local_identifiers
-
+import 'package:day_night_time_picker_plus/lib/common/picker_colors.dart';
 import 'package:day_night_time_picker_plus/lib/state/state_container.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// Render the [Hour] or [Minute] wheel for `IOS` picker
+/// Height of a single item of the wheel
+const double wheelItemExtent = 40;
 
+/// Render the [Hour] or [Minute] wheel for `IOS` picker
 class DisplayWheel extends StatelessWidget {
   /// [Controller] for the wheel
   final FixedExtentScrollController controller;
@@ -13,7 +14,13 @@ class DisplayWheel extends StatelessWidget {
   final List<int?> items;
 
   /// The Change handler
-  final Null Function(int value) onChange;
+  final void Function(int value) onChange;
+
+  /// Called when the wheel starts moving
+  final VoidCallback? onScrollStart;
+
+  /// Called when the wheel has come to rest
+  final VoidCallback? onScrollEnd;
 
   /// Callback to render custom label
   final int Function(int item)? getModifiedLabel;
@@ -30,6 +37,8 @@ class DisplayWheel extends StatelessWidget {
     required this.controller,
     required this.items,
     required this.onChange,
+    this.onScrollStart,
+    this.onScrollEnd,
     this.isSelected = false,
     this.disabled = false,
     this.getModifiedLabel,
@@ -37,46 +46,53 @@ class DisplayWheel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final timeState = TimeModelBinding.of(context);
-    final _commonTimeStyles = Theme.of(context).textTheme.displayMedium!
-        .copyWith(fontSize: 30);
+    final magnification = TimeModelBinding.of(context)
+        .widget
+        .wheelMagnification;
+    final colors = PickerColors.of(context);
+    final style = Theme.of(context).textTheme.headlineSmall!.copyWith(
+      fontSize: 26,
+      fontWeight: FontWeight.w600,
+      fontFeatures: const [FontFeature.tabularFigures()],
+      color: isSelected ? colors.accent : colors.unselected,
+    );
 
-    final color =
-        timeState.widget.accentColor ?? Theme.of(context).colorScheme.secondary;
-    final unselectedColor = timeState.widget.unselectedColor ?? Colors.grey;
-
-    return SizedBox(
-      width: 60,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 3.0),
-        child: ListWheelScrollView.useDelegate(
-          controller: controller,
-          itemExtent: 36,
-          physics: disabled
-              ? const NeverScrollableScrollPhysics()
-              : const FixedExtentScrollPhysics(parent: BouncingScrollPhysics()),
-          overAndUnderCenterOpacity: disabled ? 0 : 0.25,
-          perspective: 0.01,
-          magnification: timeState.widget.wheelMagnification,
-          onSelectedItemChanged: onChange,
-          childDelegate: ListWheelChildBuilderDelegate(
-            childCount: items.length,
-            builder: (context, index) {
-              final val =
-                  (getModifiedLabel?.call(items[index]!) ?? (items[index]!))
-                      .toString()
-                      .padLeft(2, '0');
-              return Center(
-                child: Text(
-                  val,
-                  textScaler: TextScaler.linear(0.85),
-                  style: _commonTimeStyles.copyWith(
-                    color: isSelected ? color : unselectedColor,
-                  ),
-                ),
-              );
-            },
-          ),
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (notification is ScrollStartNotification) {
+          onScrollStart?.call();
+        } else if (notification is ScrollEndNotification) {
+          onScrollEnd?.call();
+        }
+        return false;
+      },
+      child: ListWheelScrollView.useDelegate(
+        controller: controller,
+        itemExtent: wheelItemExtent,
+        physics: disabled
+            ? const NeverScrollableScrollPhysics()
+            : const FixedExtentScrollPhysics(parent: BouncingScrollPhysics()),
+        overAndUnderCenterOpacity: disabled ? 0 : 0.4,
+        perspective: 0.004,
+        useMagnifier: magnification != 1,
+        magnification: magnification,
+        onSelectedItemChanged: onChange,
+        childDelegate: ListWheelChildBuilderDelegate(
+          childCount: items.length,
+          builder: (context, index) {
+            final val =
+                (getModifiedLabel?.call(items[index]!) ?? (items[index]!))
+                    .toString()
+                    .padLeft(2, '0');
+            return Center(
+              child: AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
+                style: style,
+                child: Text(val, textScaler: TextScaler.noScaling),
+              ),
+            );
+          },
         ),
       ),
     );

@@ -2,7 +2,7 @@ import 'package:day_night_time_picker_plus/day_night_time_picker_plus.dart';
 import 'package:day_night_time_picker_plus/lib/ampm.dart';
 import 'package:day_night_time_picker_plus/lib/common/action_buttons.dart';
 import 'package:day_night_time_picker_plus/lib/common/display_value.dart';
-import 'package:day_night_time_picker_plus/lib/common/filter_wrapper.dart';
+import 'package:day_night_time_picker_plus/lib/common/picker_colors.dart';
 import 'package:day_night_time_picker_plus/lib/common/wrapper_container.dart';
 import 'package:day_night_time_picker_plus/lib/common/wrapper_dialog.dart';
 import 'package:day_night_time_picker_plus/lib/daynight_banner.dart';
@@ -40,141 +40,122 @@ class DayNightTimePickerAndroidState extends State<DayNightTimePickerAndroid> {
 
   @override
   Widget build(BuildContext context) {
-    double min = getMin(
-      timeState.widget.minMinute,
-      timeState.widget.minuteInterval,
-    );
-    double max = getMax(
-      timeState.widget.maxMinute,
-      timeState.widget.minuteInterval,
-    );
+    final picker = timeState.widget;
+    final selected = timeState.selected;
 
-    int minDiff = (max - min).round();
-    int divisions = getDivisions(minDiff, timeState.widget.minuteInterval);
-
-    if (timeState.selected == SelectedInput.HOUR) {
-      min = timeState.widget.minHour!;
-      max = timeState.widget.maxHour!;
-      divisions = (max - min).round();
+    // The range of the slider, for the value that is currently selected
+    late double min;
+    late double max;
+    late int divisions;
+    late double value;
+    switch (selected) {
+      case SelectedInput.HOUR:
+        min = picker.minHour!;
+        max = picker.maxHour!;
+        divisions = (max - min).round();
+        value = timeState.time.hour.toDouble();
+      case SelectedInput.MINUTE:
+        min = getMin(picker.minMinute, picker.minuteInterval);
+        max = getMax(picker.maxMinute, picker.minuteInterval);
+        divisions = getDivisions((max - min).round(), picker.minuteInterval);
+        value = timeState.time.minute.toDouble();
+      case SelectedInput.SECOND:
+        min = getMin(picker.minSecond, picker.secondInterval);
+        max = getMax(picker.maxSecond, picker.secondInterval);
+        divisions = getDivisions((max - min).round(), picker.secondInterval);
+        value = timeState.time.second.toDouble();
     }
 
-    final color =
-        timeState.widget.accentColor ?? Theme.of(context).colorScheme.secondary;
+    final color = PickerColors.of(context).accent;
 
-    final hourValue = timeState.widget.is24HrFormat
+    final hourValue = picker.is24HrFormat
         ? timeState.time.hour
         : timeState.time.hourOfPeriod;
 
-    final ltrMode = timeState.widget.ltrMode
-        ? TextDirection.ltr
-        : TextDirection.rtl;
-
-    final hideButtons = timeState.widget.hideButtons;
-
-    Orientation currentOrientation = MediaQuery.of(context).orientation;
-
-    double value = timeState.time.hour.roundToDouble();
-    if (timeState.selected == SelectedInput.MINUTE) {
-      value = timeState.time.minute.roundToDouble();
-    } else if (timeState.selected == SelectedInput.SECOND) {
-      value = timeState.time.second.roundToDouble();
-    }
-
-    return Center(
-      child: SingleChildScrollView(
-        physics: currentOrientation == Orientation.portrait
-            ? const NeverScrollableScrollPhysics()
-            : const AlwaysScrollableScrollPhysics(),
-        child: FilterWrapper(
-          child: WrapperDialog(
+    return WrapperDialog(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          DayNightBanner(
+            sunrise: widget.sunrise,
+            sunset: widget.sunset,
+            duskSpanInMinutes: widget.duskSpanInMinutes,
+          ),
+          WrapperContainer(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                DayNightBanner(
-                  sunrise: widget.sunrise,
-                  sunset: widget.sunset,
-                  duskSpanInMinutes: widget.duskSpanInMinutes,
-                ),
-                WrapperContainer(
-                  child: Column(
+                const AmPm(),
+                const SizedBox(height: 8),
+                const Spacer(),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    textDirection: picker.ltrMode
+                        ? TextDirection.ltr
+                        : TextDirection.rtl,
                     mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
-                      const AmPm(),
-                      const SizedBox(height: 8),
-                      const Spacer(),
-                      Row(
-                        textDirection: ltrMode,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: <Widget>[
-                          DisplayValue(
-                            onTap: timeState.widget.disableHour!
-                                ? null
-                                : () {
-                                    timeState.onSelectedInputChange(
-                                      SelectedInput.HOUR,
-                                    );
-                                  },
-                            value: hourValue.toString().padLeft(2, '0'),
-                            isSelected:
-                                timeState.selected == SelectedInput.HOUR,
-                          ),
-                          const DisplayValue(value: ':'),
-                          DisplayValue(
-                            onTap: timeState.widget.disableMinute!
-                                ? null
-                                : () {
-                                    timeState.onSelectedInputChange(
-                                      SelectedInput.MINUTE,
-                                    );
-                                  },
-                            value: timeState.time.minute.toString().padLeft(
-                              2,
-                              '0',
-                            ),
-                            isSelected:
-                                timeState.selected == SelectedInput.MINUTE,
-                          ),
-                          ...timeState.widget.showSecondSelector
-                              ? [
-                                  const DisplayValue(value: ':'),
-                                  DisplayValue(
-                                    onTap: () {
-                                      timeState.onSelectedInputChange(
-                                        SelectedInput.SECOND,
-                                      );
-                                    },
-                                    value: timeState.time.second
-                                        .toString()
-                                        .padLeft(2, '0'),
-                                    isSelected:
-                                        timeState.selected ==
-                                        SelectedInput.SECOND,
-                                  ),
-                                ]
-                              : [],
-                        ],
+                      DisplayValue(
+                        onTap: picker.disableHour!
+                            ? null
+                            : () => timeState.onSelectedInputChange(
+                                SelectedInput.HOUR,
+                              ),
+                        value: hourValue.toString().padLeft(2, '0'),
+                        isSelected: selected == SelectedInput.HOUR,
                       ),
-                      Slider(
-                        onChangeEnd: (_) => onChangedSlider(),
-                        value: value,
-                        onChanged: timeState.onTimeChange,
-                        min: min,
-                        max: max,
-                        divisions: divisions,
-                        activeColor: color,
-                        inactiveColor: color.withAlpha(55),
+                      const DisplaySeparator(),
+                      DisplayValue(
+                        onTap: picker.disableMinute!
+                            ? null
+                            : () => timeState.onSelectedInputChange(
+                                SelectedInput.MINUTE,
+                              ),
+                        value: timeState.time.minute.toString().padLeft(2, '0'),
+                        isSelected: selected == SelectedInput.MINUTE,
                       ),
-                      const Spacer(),
-                      if (!hideButtons) const ActionButtons(),
+                      if (picker.showSecondSelector) ...[
+                        const DisplaySeparator(),
+                        DisplayValue(
+                          onTap: () => timeState.onSelectedInputChange(
+                            SelectedInput.SECOND,
+                          ),
+                          value: timeState.time.second.toString().padLeft(
+                            2,
+                            '0',
+                          ),
+                          isSelected: selected == SelectedInput.SECOND,
+                        ),
+                      ],
                     ],
                   ),
                 ),
+                const SizedBox(height: 4),
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 6,
+                    tickMarkShape: SliderTickMarkShape.noTickMark,
+                  ),
+                  child: Slider(
+                    onChangeEnd: (_) => onChangedSlider(),
+                    value: value.clamp(min, max),
+                    onChanged: timeState.onTimeChange,
+                    min: min,
+                    max: max,
+                    divisions: divisions > 0 ? divisions : null,
+                    activeColor: color,
+                    inactiveColor: color.withValues(alpha: 0.18),
+                  ),
+                ),
+                const Spacer(),
+                if (!picker.hideButtons) const ActionButtons(),
               ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }

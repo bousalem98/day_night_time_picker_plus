@@ -45,7 +45,8 @@ class TimeModelBinding extends StatefulWidget {
   final bool blurredBackground;
 
   /// Set the background color of the [Modal].
-  final Color backgroundColor;
+  /// Defaults to the surface color of the theme.
+  final Color? backgroundColor;
 
   /// Border radius of the [Container] in [double].
   final double? borderRadius;
@@ -190,7 +191,7 @@ class TimeModelBinding extends StatefulWidget {
     this.sunAsset,
     this.moonAsset,
     this.blurredBackground = false,
-    Color? backgroundColor,
+    this.backgroundColor,
     this.borderRadius,
     this.elevation,
     this.dialogInsetPadding,
@@ -230,9 +231,8 @@ class TimeModelBinding extends StatefulWidget {
     this.sunset,
     this.duskSpanInMinutes,
   }) : height = height ?? 260,
-       wheelHeight = wheelHeight ?? 100,
-       wheelMagnification = wheelMagnification ?? 1.0,
-       backgroundColor = backgroundColor ?? Colors.white;
+       wheelHeight = wheelHeight ?? 120,
+       wheelMagnification = wheelMagnification ?? 1.0;
 
   @override
   TimeModelBindingState createState() => TimeModelBindingState();
@@ -274,16 +274,23 @@ class TimeModelBindingState extends State<TimeModelBinding> {
 
   @override
   void initState() {
-    SelectedInput _selected = SelectedInput.HOUR;
-
-    if (widget.focusMinutePicker || widget.disableHour!) {
-      _selected = SelectedInput.MINUTE;
-    }
-
-    setState(() {
-      selected = _selected;
-    });
     super.initState();
+    if (widget.focusMinutePicker || widget.disableHour!) {
+      selected = SelectedInput.MINUTE;
+    }
+  }
+
+  /// Follow the value of an inline picker when its parent provides a new one
+  @override
+  void didUpdateWidget(TimeModelBinding oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final value = widget.initialTime;
+    final oldValue = oldWidget.initialTime;
+    if (value.hour != oldValue.hour ||
+        value.minute != oldValue.minute ||
+        value.second != oldValue.second) {
+      time = value;
+    }
   }
 
   /// Whether the [DayPeriod] changed or not
@@ -358,16 +365,20 @@ class TimeModelBindingState extends State<TimeModelBinding> {
       );
       widget.onChangeDateTime!(dateTime);
     }
-    onCancel(result: time);
+    _close(time);
   }
 
-  /// Handler to close the picker
-  void onCancel({dynamic result}) {
+  /// Handler for the Cancel button
+  void onCancel() {
     if (widget.onCancel != null) {
       widget.onCancel!();
       return;
     }
+    _close(null);
+  }
 
+  /// Close the picker, unless it is inline which has nothing to close
+  void _close(Time? result) {
     if (!widget.isInlineWidget) {
       Navigator.of(context).pop(result);
     }

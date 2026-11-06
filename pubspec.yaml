@@ -1,6 +1,6 @@
 name: day_night_time_picker_plus
 description: A day night time picker for Flutter with Sun and Moon assets, migrated from the original day_night_time_picker package with modern material_ui support.
-version: 0.0.1
+version: 0.0.2
 homepage: https://github.com/bousalem98/day_night_time_picker_plus
 repository: https://github.com/bousalem98/day_night_time_picker_plus
 issue_tracker: https://github.com/bousalem98/day_night_time_picker_plus/issues

@@ -115,6 +115,18 @@ List<int?> generateHours(int divisions, min, max) {
   return hours;
 }
 
+/// Index of the item the closest to [value], for values that are not an item.
+/// For example with a time of `xx:33` on a minute list in steps of 5.
+int nearestIndex(List<int?> items, int value) {
+  var nearest = 0;
+  for (var i = 1; i < items.length; i++) {
+    if ((items[i]! - value).abs() < (items[nearest]! - value).abs()) {
+      nearest = i;
+    }
+  }
+  return nearest;
+}
+
 /// Convert TimeOfDay to double for comparison
 double timeOfDayToDouble(TimeOfDay myTime) =>
     myTime.hour + myTime.minute / 60.0;

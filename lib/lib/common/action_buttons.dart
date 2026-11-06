@@ -1,3 +1,4 @@
+import 'package:day_night_time_picker_plus/lib/common/picker_colors.dart';
 import 'package:day_night_time_picker_plus/lib/state/state_container.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -8,43 +9,45 @@ class ActionButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final timeState = TimeModelBinding.of(context);
-    final color =
-        timeState.widget.accentColor ?? Theme.of(context).colorScheme.secondary;
-    final defaultButtonStyle = TextButton.styleFrom(
-      textStyle: TextStyle(color: color),
-    );
-
-    if (timeState.widget.isOnValueChangeMode) {
+    final picker = timeState.widget;
+    if (picker.isOnValueChangeMode) {
       return const SizedBox(height: 8);
     }
 
-    return IntrinsicHeight(
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: <Widget>[
-          if (timeState.widget.showCancelButton)
-            TextButton(
-              style:
-                  (timeState.widget.cancelButtonStyle ??
-                      timeState.widget.buttonStyle) ??
-                  defaultButtonStyle,
-              onPressed: timeState.onCancel,
-              child: Text(
-                timeState.widget.cancelText,
-                style: timeState.widget.cancelStyle,
-              ),
-            ),
-          SizedBox(width: timeState.widget.buttonsSpacing ?? 0),
+    final colors = PickerColors.of(context);
+    final cancelStyle =
+        picker.cancelButtonStyle ??
+        picker.buttonStyle ??
+        TextButton.styleFrom(foregroundColor: colors.unselected);
+    final okText = Text(picker.okText, style: picker.okStyle);
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: <Widget>[
+        if (picker.showCancelButton)
+          TextButton(
+            style: cancelStyle,
+            onPressed: timeState.onCancel,
+            child: Text(picker.cancelText, style: picker.cancelStyle),
+          ),
+        SizedBox(width: picker.buttonsSpacing ?? 8),
+        // A custom style was written for the text button, so keep it on one.
+        if (picker.buttonStyle != null)
           TextButton(
             onPressed: timeState.onOk,
-            style: timeState.widget.buttonStyle ?? defaultButtonStyle,
-            child: Text(
-              timeState.widget.okText,
-              style: timeState.widget.okStyle,
+            style: picker.buttonStyle,
+            child: okText,
+          )
+        else
+          FilledButton(
+            onPressed: timeState.onOk,
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.accent,
+              foregroundColor: colors.onAccent,
             ),
+            child: okText,
           ),
-        ],
-      ),
+      ],
     );
   }
 }

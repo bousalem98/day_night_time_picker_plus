@@ -1,31 +1,41 @@
 import 'dart:ui';
 
-import 'package:day_night_time_picker_plus/lib/state/state_container.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// Needed to use Backdrop filter conditionally, since `ImageFilter.blur`
-/// was causing an issue in [web] when both the `sigma` values are `zero`
+/// Blurs whatever is behind the picker, following the [animation] of the route.
+///
+/// It is a sibling of the picker rather than its parent, since a backdrop
+/// filter inside of the picker's fade would not blend with it. The blur is not
+/// applied when its `sigma` is `zero`, since `ImageFilter.blur` was causing an
+/// issue in [web] in that case.
 ///
 /// See https://github.com/flutter/flutter/issues/77258#issuecomment-822006335
 class FilterWrapper extends StatelessWidget {
-  /// child of the filter in the [Widget] tree
-  final Widget? child;
+  /// The animation of the route, from `0` to `1`
+  final Animation<double> animation;
+
+  /// Blur amount when the picker is fully open
+  final double sigma;
 
   /// Constructor for the [Widget]
-  const FilterWrapper({super.key, this.child});
+  const FilterWrapper({super.key, required this.animation, this.sigma = 5});
 
   @override
   Widget build(BuildContext context) {
-    final timeState = TimeModelBinding.of(context);
-    final double blurAmount = timeState.widget.blurredBackground ? 5 : 0;
-
-    if (blurAmount == 0.0) {
-      return Container(child: child);
-    }
-
-    return BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: blurAmount, sigmaY: blurAmount),
-      child: child,
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: animation,
+        builder: (context, _) {
+          final blur = sigma * animation.value;
+          if (blur <= 0) {
+            return const SizedBox.expand();
+          }
+          return BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+            child: const SizedBox.expand(),
+          );
+        },
+      ),
     );
   }
 }

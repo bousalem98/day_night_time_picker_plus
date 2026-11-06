@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+
+import 'package:day_night_time_picker_plus/lib/common/picker_colors.dart';
 import 'package:day_night_time_picker_plus/lib/constants.dart';
 import 'package:day_night_time_picker_plus/lib/state/state_container.dart';
 import 'package:material_ui/material_ui.dart';
@@ -12,21 +15,27 @@ class WrapperDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final timeState = TimeModelBinding.of(context);
-    final borderRadius = timeState.widget.borderRadius ?? BORDER_RADIUS;
-    final elevation = timeState.widget.elevation ?? ELEVATION;
-    final backgroundColor = timeState.widget.backgroundColor;
+    final picker = TimeModelBinding.of(context).widget;
+    final borderRadius = picker.borderRadius ?? BORDER_RADIUS;
 
+    // The scroll view is inside of the dialog and not around it, so that it can
+    // only take taps on the picker and those around it reach the barrier. It
+    // only scrolls when the picker does not fit, like in landscape.
     return Dialog(
-      insetPadding: timeState.widget.dialogInsetPadding,
-      backgroundColor: backgroundColor,
+      insetPadding: picker.dialogInsetPadding,
+      backgroundColor: PickerColors.of(context).background,
+      surfaceTintColor: Colors.transparent,
+      constraints: BoxConstraints(
+        minWidth: math.min(280, picker.width),
+        maxWidth: picker.width,
+      ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(borderRadius),
       ),
-      elevation: elevation,
+      elevation: picker.elevation ?? ELEVATION,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
-        child: IntrinsicHeight(child: child),
+        child: SingleChildScrollView(child: IntrinsicHeight(child: child)),
       ),
     );
   }

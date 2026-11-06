@@ -1,3 +1,4 @@
+import 'package:day_night_time_picker_plus/lib/common/picker_colors.dart';
 import 'package:day_night_time_picker_plus/lib/state/state_container.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -11,14 +12,13 @@ class WrapperContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var timeState = TimeModelBinding.of(context);
-    double height = timeState.widget.height;
-    Color backgroundColor = timeState.widget.backgroundColor;
+    final picker = TimeModelBinding.of(context).widget;
     return Expanded(
       child: Container(
-        height: height,
-        color: backgroundColor,
-        padding: timeState.widget.contentPadding,
+        // A minimum, so that taller content such as a tall wheel can not overflow.
+        constraints: BoxConstraints(minHeight: picker.height),
+        color: PickerColors.of(context).background,
+        padding: picker.contentPadding,
         child: child,
       ),
     );
